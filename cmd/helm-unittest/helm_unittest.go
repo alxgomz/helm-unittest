@@ -22,6 +22,9 @@ type testOptions struct {
 	updateSnapshot          bool
 	withSubChart            bool
 	useSkipSchemaValidation bool
+	coverage                bool
+	coverageFile            string
+	coverageFormat          string
 	testFiles               []string
 	valuesFiles             []string
 	outputFile              string
@@ -89,6 +92,10 @@ func RunPlugin(cmd *cobra.Command, chartPaths []string) {
 		testConfig.testFiles = []string{defaultFilePattern}
 	}
 
+	if testConfig.coverageFile != "" {
+		testConfig.coverage = true
+	}
+
 	formatter := formatter.NewFormatter(testConfig.outputFile, testConfig.outputType)
 	printer := printer.NewPrinter(os.Stdout, colored)
 	testRunner = unittest.TestRunner{
@@ -99,6 +106,9 @@ func RunPlugin(cmd *cobra.Command, chartPaths []string) {
 		Strict:               testConfig.useStrict,
 		Failfast:             testConfig.useFailfast,
 		SkipSchemaValidation: testConfig.useSkipSchemaValidation,
+		Coverage:             testConfig.coverage,
+		CoverageFile:         testConfig.coverageFile,
+		CoverageFormat:       testConfig.coverageFormat,
 		TestFiles:            testConfig.testFiles,
 		ValuesFiles:          testConfig.valuesFiles,
 		OutputFile:           testConfig.outputFile,
@@ -189,6 +199,21 @@ func InitPluginFlags(cmd *cobra.Command) {
 	cmd.PersistentFlags().BoolVar(
 		&testConfig.useSkipSchemaValidation, "skip-schema-validation", false,
 		"skip values schema validation when rendering the chart",
+	)
+
+	cmd.PersistentFlags().BoolVar(
+		&testConfig.coverage, "coverage", false,
+		"enable code coverage reporting for chart templates",
+	)
+
+	cmd.PersistentFlags().StringVar(
+		&testConfig.coverageFile, "coverage-file", "",
+		"write coverage report to the given path (implies --coverage)",
+	)
+
+	cmd.PersistentFlags().StringVar(
+		&testConfig.coverageFormat, "coverage-format", "json",
+		"format(s) for --coverage-file: json | cobertura | lcov | html. Comma-separated for multiple (e.g. cobertura,lcov,html); in that case --coverage-file is used as a path stem and per-format extensions are appended (.xml/.info/.html/.json)",
 	)
 }
 
