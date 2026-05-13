@@ -274,11 +274,12 @@ Output columns:
 Use `--coverage-file path/to/report` to emit a machine-readable report; this
 flag implies `--coverage`. The format is controlled by `--coverage-format`:
 
-| Format      | Flag value   | Consumed by                                                         |
-|-------------|--------------|---------------------------------------------------------------------|
-| JSON (default) | `json`    | Custom dashboards, this repo's own schema                           |
+| Format      | Flag value    | Consumed by                                                          |
+|-------------|---------------|----------------------------------------------------------------------|
+| JSON (default) | `json`     | Custom dashboards, this repo's own schema                            |
 | Cobertura XML | `cobertura` | Codecov, SonarQube, GitLab, Jenkins (Cobertura plugin), Azure DevOps |
-| LCOV        | `lcov`       | Coveralls, Codecov, VS Code "Coverage Gutters", JetBrains import    |
+| LCOV          | `lcov`      | Coveralls, Codecov, VS Code "Coverage Gutters", JetBrains import     |
+| HTML          | `html`      | Standalone single-file page — open in any browser, attach as a CI artifact. Source code is embedded with per-line colour coding (covered / missed / partial) and a sortable file list. |
 
 Action probes are reported as line coverage (Cobertura `<line>` / LCOV `DA`);
 branch and loop probes are reported as branches (Cobertura `condition-coverage`
