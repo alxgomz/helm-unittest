@@ -358,7 +358,7 @@ func (t *TestJob) renderForCoverage(userValues []byte, tracker *coverage.Tracker
 		return nil, err
 	}
 
-	vals, err := v3util.ToRenderValuesWithSchemaValidation(instrumented, values.AsMap(), options, t.capabilitiesV3(), false)
+	vals, err := v3util.ToRenderValuesWithSchemaValidation(instrumented, values.AsMap(), options, t.capabilitiesV3(), t.configOrDefault().isSkipSchemaValidation)
 	if err != nil {
 		return nil, err
 	}
