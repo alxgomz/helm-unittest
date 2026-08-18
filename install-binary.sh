@@ -49,7 +49,8 @@ buildFromSource() {
   fi
   (cd "$HELM_PLUGIN_PATH" && go build -o untt ./cmd/helm-unittest) || return 1
   chmod +x "$HELM_PLUGIN_PATH/untt"
-  echo "$PROJECT_NAME built from source into $HELM_PLUGIN_PATH"
+  mv "$HELM_PLUGIN_PATH/untt" "$HELM_PLUGIN_PATH/untt-${OS}-${ARCH}"
+  echo "$PROJECT_NAME built from source into $HELM_PLUGIN_PATH/untt-${OS}-${ARCH}"
   return 0
 }
 
