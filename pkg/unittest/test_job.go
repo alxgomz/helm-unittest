@@ -333,10 +333,12 @@ func (t *TestJob) renderForCoverage(userValues []byte, tracker *coverage.Tracker
 	if tracker == nil {
 		return nil, nil
 	}
-	instrumented := tracker.InstrumentedChart()
-	if instrumented == nil {
+	sharedInstrumented := tracker.InstrumentedChart()
+	if sharedInstrumented == nil {
 		return nil, nil
 	}
+	// Deep-copy first: the mutations below (ProcessDependenciesWithMerge subchart pruning, ModifyChartMetadata) would otherwise corrupt the tracker's shared instrumented chart for later jobs.
+	instrumented := FullCopyV3Chart(t.chartRoute, sharedInstrumented.Name(), sharedInstrumented)
 
 	values, err := v3util.ReadValues(userValues)
 	if err != nil {
@@ -349,11 +351,6 @@ func (t *TestJob) renderForCoverage(userValues []byte, tracker *coverage.Tracker
 		}
 	}
 
-	// ProcessDependenciesWithMerge mutates the chart in place to apply
-	// dependency-condition logic. We call it on the instrumented copy so it
-	// sees the same value-driven enable/disable decisions as the primary
-	// render. Mutating the tracker's chart between renders is acceptable
-	// because the operation is deterministic for a given (chart, values) pair.
 	if err = v3util.ProcessDependenciesWithMerge(instrumented, values); err != nil {
 		return nil, err
 	}

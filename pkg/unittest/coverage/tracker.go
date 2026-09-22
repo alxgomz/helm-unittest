@@ -174,7 +174,9 @@ func (t *Tracker) registerTemplateMeta(key string, meta TemplateMeta) {
 }
 
 // InstrumentedChart returns the deep-copied, instrumented chart suitable for
-// rendering through helm.sh/helm/v3/pkg/engine.
+// rendering through helm.sh/helm/v3/pkg/engine. It is shared across all jobs and
+// suites of the chart, so callers must clone it before any in-place mutation
+// (e.g. ProcessDependenciesWithMerge) to avoid corrupting later coverage renders.
 func (t *Tracker) InstrumentedChart() *v3chart.Chart {
 	return t.instrumentedChart
 }
