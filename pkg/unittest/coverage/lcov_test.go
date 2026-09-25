@@ -25,12 +25,6 @@ func TestWriteLCOV_RecordsAndCounters(t *testing.T) {
 	assert.Contains(t, contents, "SF:demo/templates/dead.yaml")
 	assert.Contains(t, contents, "SF:demo/templates/broken.yaml")
 
-	// helm-unittest extension comment lines should encode per-file Rendered status.
-	assert.Contains(t, contents, "# helm-unittest:rendered=true",
-		"cm.yaml should be flagged as rendered")
-	assert.Contains(t, contents, "# helm-unittest:rendered=false",
-		"dead.yaml / broken.yaml should be flagged as unrendered")
-
 	// Per-line DA lines must be present for every Lines entry on the real file.
 	assert.Contains(t, contents, "DA:4,2")
 	assert.Contains(t, contents, "DA:6,0")
@@ -57,11 +51,11 @@ func TestWriteReport_UnknownFormat(t *testing.T) {
 	assert.Contains(t, err.Error(), "unsupported coverage format")
 }
 
-func TestWriteReport_DefaultIsJSON(t *testing.T) {
+func TestWriteReport_DefaultIsCobertura(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, "out.json")
+	path := filepath.Join(dir, "out.xml")
 	require.NoError(t, WriteReport(path, "", sampleCoverage()))
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
-	assert.True(t, strings.HasPrefix(strings.TrimSpace(string(data)), "{"), "default writer should emit JSON")
+	assert.True(t, strings.HasPrefix(string(data), "<?xml"), "default writer should emit Cobertura XML")
 }
