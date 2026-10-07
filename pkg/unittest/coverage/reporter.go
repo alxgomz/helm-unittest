@@ -1,7 +1,6 @@
 package coverage
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -10,6 +9,60 @@ import (
 
 	"github.com/helm-unittest/helm-unittest/pkg/unittest/printer"
 )
+
+// RemapRoot rewrites each file's path from being rooted at chartName to
+// reportRoot instead, since a chart's Chart.yaml name doesn't have to match
+// the directory report consumers resolve filename/SF: paths against.
+func RemapRoot(cov Coverage, chartName, reportRoot string) Coverage {
+	if reportRoot == chartName {
+		return cov
+	}
+	prefix := chartName + "/"
+	out := cov
+	out.Files = make([]FileCoverage, len(cov.Files))
+	for i, f := range cov.Files {
+		if rest, ok := strings.CutPrefix(f.Name, prefix); ok {
+			if reportRoot == "" {
+				f.Name = rest
+			} else {
+				f.Name = reportRoot + "/" + rest
+			}
+		}
+		out.Files[i] = f
+	}
+	return out
+}
+
+// MergeReports combines multiple per-chart Coverage snapshots into one
+// report; files simply concatenate since each is already rooted at its own
+// chart's directory. A single-chart run is returned unchanged.
+func MergeReports(covs []Coverage) Coverage {
+	if len(covs) <= 1 {
+		if len(covs) == 1 {
+			return covs[0]
+		}
+		return Coverage{}
+	}
+	names := make([]string, 0, len(covs))
+	merged := Coverage{}
+	for _, cov := range covs {
+		if cov.ChartName != "" {
+			names = append(names, cov.ChartName)
+		}
+		merged.Files = append(merged.Files, cov.Files...)
+		merged.Totals.Actions.Covered += cov.Totals.Actions.Covered
+		merged.Totals.Actions.Total += cov.Totals.Actions.Total
+		merged.Totals.Actions.Hits += cov.Totals.Actions.Hits
+		merged.Totals.Branches.Covered += cov.Totals.Branches.Covered
+		merged.Totals.Branches.Total += cov.Totals.Branches.Total
+		merged.Totals.Branches.Hits += cov.Totals.Branches.Hits
+		merged.Totals.Loops.Covered += cov.Totals.Loops.Covered
+		merged.Totals.Loops.Total += cov.Totals.Loops.Total
+		merged.Totals.Loops.Hits += cov.Totals.Loops.Hits
+	}
+	merged.ChartName = strings.Join(names, ",")
+	return merged
+}
 
 // RenderConsole prints a human-friendly per-template coverage table to the
 // provided printer. If p is nil, plain text is written to os.Stdout.
@@ -214,10 +267,8 @@ func joinInts(xs []int) string {
 }
 
 const (
-	FormatJSON      = "json"
 	FormatCobertura = "cobertura"
 	FormatLCOV      = "lcov"
-	FormatHTML      = "html"
 )
 
 // FormatExt returns the conventional file extension for a coverage format
@@ -226,29 +277,25 @@ const (
 // for unknown formats.
 func FormatExt(format string) string {
 	switch format {
-	case FormatJSON:
-		return ".json"
 	case FormatCobertura:
 		return ".xml"
 	case FormatLCOV:
 		return ".info"
-	case FormatHTML:
-		return ".html"
 	default:
 		return ""
 	}
 }
 
 // ParseFormats parses a comma-separated --coverage-format value, trimming
-// whitespace around each entry. An empty string defaults to ["json"]. Any
-// unrecognised format produces an error so misspellings fail loudly instead
-// of being silently dropped.
+// whitespace around each entry. An empty string defaults to ["cobertura"].
+// Any unrecognised format produces an error so misspellings fail loudly
+// instead of being silently dropped.
 func ParseFormats(s string) ([]string, error) {
 	if strings.TrimSpace(s) == "" {
-		return []string{FormatJSON}, nil
+		return []string{FormatCobertura}, nil
 	}
 	known := map[string]bool{
-		FormatJSON: true, FormatCobertura: true, FormatLCOV: true, FormatHTML: true,
+		FormatCobertura: true, FormatLCOV: true,
 	}
 	parts := strings.Split(s, ",")
 	out := make([]string, 0, len(parts))
@@ -259,7 +306,7 @@ func ParseFormats(s string) ([]string, error) {
 			continue
 		}
 		if !known[p] {
-			return nil, fmt.Errorf("unsupported coverage format %q (want json, cobertura, lcov, or html)", p)
+			return nil, fmt.Errorf("unsupported coverage format %q (want cobertura or lcov)", p)
 		}
 		if seen[p] {
 			continue // ignore duplicates rather than writing the same file twice
@@ -280,7 +327,7 @@ type FileTarget struct {
 
 // knownExtensions lists every extension ResolveOutputPaths is willing to strip
 // when treating a user-provided --coverage-file as a stem.
-var knownExtensions = []string{".json", ".xml", ".info", ".html"}
+var knownExtensions = []string{".xml", ".info"}
 
 // ResolveOutputPaths maps the user's --coverage-file value to a list of
 // concrete (path, format) targets.
@@ -320,87 +367,11 @@ func ResolveOutputPaths(file string, formats []string) []FileTarget {
 // expected to validate user input before calling.
 func WriteReport(path, format string, cov Coverage) error {
 	switch format {
-	case "", FormatJSON:
-		return WriteJSON(path, cov)
-	case FormatCobertura:
+	case "", FormatCobertura:
 		return WriteCobertura(path, cov)
 	case FormatLCOV:
 		return WriteLCOV(path, cov)
-	case FormatHTML:
-		return WriteHTML(path, cov)
 	default:
-		return fmt.Errorf("unsupported coverage format %q (want json, cobertura, lcov, or html)", format)
+		return fmt.Errorf("unsupported coverage format %q (want cobertura or lcov)", format)
 	}
-}
-
-// WriteJSON writes a stable JSON document to path describing per-file and
-// total coverage. The schema is intended for CI consumption and is documented
-// in DOCUMENT.md.
-func WriteJSON(path string, cov Coverage) error {
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-
-	enc := json.NewEncoder(f)
-	enc.SetIndent("", "  ")
-	return enc.Encode(toJSONReport(cov))
-}
-
-type jsonStat struct {
-	Covered int     `json:"covered"`
-	Total   int     `json:"total"`
-	Pct     float64 `json:"pct"`
-	Hits    int64   `json:"hits"`
-}
-
-type jsonFile struct {
-	Name        string   `json:"name"`
-	ParseError  string   `json:"parseError,omitempty"`
-	Rendered    bool     `json:"rendered"`
-	Actions     jsonStat `json:"actions"`
-	Branches    jsonStat `json:"branches"`
-	Loops       jsonStat `json:"loops"`
-	MissedLines []int    `json:"missedLines,omitempty"`
-}
-
-type jsonReport struct {
-	Chart  string     `json:"chart"`
-	Files  []jsonFile `json:"files"`
-	Totals struct {
-		Actions  jsonStat `json:"actions"`
-		Branches jsonStat `json:"branches"`
-		Loops    jsonStat `json:"loops"`
-	} `json:"totals"`
-}
-
-func toJSONReport(cov Coverage) jsonReport {
-	r := jsonReport{Chart: cov.ChartName}
-	for _, f := range cov.Files {
-		entry := jsonFile{
-			Name:        f.Name,
-			Rendered:    f.Rendered,
-			Actions:     toJSONStat(f.Actions),
-			Branches:    toJSONStat(f.Branches),
-			Loops:       toJSONStat(f.Loops),
-			MissedLines: f.MissedLines,
-		}
-		if f.ParseError != nil {
-			entry.ParseError = f.ParseError.Error()
-		}
-		r.Files = append(r.Files, entry)
-	}
-	r.Totals.Actions = toJSONStat(cov.Totals.Actions)
-	r.Totals.Branches = toJSONStat(cov.Totals.Branches)
-	r.Totals.Loops = toJSONStat(cov.Totals.Loops)
-	return r
-}
-
-func toJSONStat(s CountStat) jsonStat {
-	pct := s.Pct()
-	if pct < 0 {
-		pct = 0
-	}
-	return jsonStat{Covered: s.Covered, Total: s.Total, Pct: pct, Hits: s.Hits}
 }

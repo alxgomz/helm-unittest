@@ -4,35 +4,10 @@ import (
 	"fmt"
 	"strings"
 	"text/template/parse"
-
-	"github.com/Masterminds/sprig/v3"
 )
 
 // probeFuncName must emit no output so helpers whose result is consumed as data (include ... | fromJson) stay valid after instrumentation.
 const probeFuncName = "covprobe"
-
-// stubFuncs provides placeholder funcs (seeded from Sprig plus Helm's extras) so the
-// parser accepts any function reference; Helm binds and executes the real ones at render time.
-func stubFuncs() map[string]any {
-	stub := func(_ ...any) any { return nil }
-	stubErr := func(_ ...any) (any, error) { return nil, nil }
-
-	m := map[string]any{}
-	for name := range sprig.GenericFuncMap() {
-		m[name] = stub
-	}
-	helmExtras := []string{
-		"include", "tpl", "fail",
-		"toYaml", "toYamlPretty", "toToml", "toJson",
-		"fromYaml", "fromYamlArray", "fromJson", "fromJsonArray",
-	}
-	for _, n := range helmExtras {
-		m[n] = stub
-	}
-	m["required"] = stubErr
-	m["lookup"] = stubErr
-	return m
-}
 
 // Instrumenter rewrites a parsed template with a covprobe call at each tracked construct.
 type Instrumenter struct {
@@ -58,11 +33,12 @@ func (in *Instrumenter) emit(s string) {
 
 // Instrument returns the instrumented source; on parse failure it returns the input unchanged with meta.ParseError set.
 func (t *Tracker) Instrument(name string, data []byte) ([]byte, TemplateMeta) {
-	meta := TemplateMeta{Name: name, Source: data}
+	meta := TemplateMeta{Name: name}
 
 	// SkipFuncCheck: we never execute these templates, so unknown funcs need not resolve; Helm resolves them at render time.
+	// The mode makes the tree ignore its funcs map entirely, so no stub map is needed here.
 	trees := map[string]*parse.Tree{}
-	tree := parse.New(name, stubFuncs())
+	tree := parse.New(name, nil)
 	tree.Mode = parse.SkipFuncCheck
 	if _, err := tree.Parse(string(data), "{{", "}}", trees); err != nil {
 		meta.ParseError = err
@@ -114,7 +90,6 @@ func (in *Instrumenter) walkList(list *parse.ListNode, meta *TemplateMeta) {
 func (in *Instrumenter) walk(node parse.Node, meta *TemplateMeta) {
 	switch n := node.(type) {
 	case *parse.ActionNode:
-		in.maybeEmitImplicitBranch(n, meta)
 		in.emit(n.String())
 		in.emitProbe(ProbeAction, n.Pos, "action", meta)
 	case *parse.TemplateNode:
