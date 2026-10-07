@@ -8,7 +8,6 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"github.com/helm-unittest/helm-unittest/pkg/unittest"
-	"github.com/helm-unittest/helm-unittest/pkg/unittest/coverage"
 	"github.com/helm-unittest/helm-unittest/pkg/unittest/formatter"
 	"github.com/helm-unittest/helm-unittest/pkg/unittest/printer"
 	"github.com/spf13/cobra"
@@ -76,10 +75,10 @@ Check https://github.com/helm-unittest/helm-unittest for more
 details about how to write tests.
 `,
 	Args: cobra.MinimumNArgs(1),
-	RunE: RunPlugin,
+	Run:  RunPlugin,
 }
 
-func RunPlugin(cmd *cobra.Command, chartPaths []string) error {
+func RunPlugin(cmd *cobra.Command, chartPaths []string) {
 	var colored *bool
 	if cmd.PersistentFlags().Changed("color") {
 		if testConfig.colored == "true" || testConfig.colored == "always" {
@@ -108,12 +107,6 @@ func RunPlugin(cmd *cobra.Command, chartPaths []string) error {
 
 	if testConfig.coverageFile != "" {
 		testConfig.coverage = true
-	}
-
-	if testConfig.coverage {
-		if _, err := coverage.ParseFormats(testConfig.coverageFormat); err != nil {
-			return fmt.Errorf("invalid --coverage-format: %w", err)
-		}
 	}
 
 	formatter := formatter.NewFormatter(testConfig.outputFile, testConfig.outputType)
@@ -148,7 +141,6 @@ func RunPlugin(cmd *cobra.Command, chartPaths []string) error {
 	if !passed {
 		os.Exit(1)
 	}
-	return nil
 }
 
 // main to execute execute unittest command
@@ -249,8 +241,8 @@ func InitPluginFlags(cmd *cobra.Command) {
 	)
 
 	cmd.PersistentFlags().StringVar(
-		&testConfig.coverageFormat, "coverage-format", "cobertura",
-		"format(s) for --coverage-file: cobertura | lcov. Comma-separated for multiple (e.g. cobertura,lcov); in that case --coverage-file is used as a path stem and per-format extensions are appended (.xml/.info)",
+		&testConfig.coverageFormat, "coverage-format", "json",
+		"format(s) for --coverage-file: json | cobertura | lcov | html. Comma-separated for multiple (e.g. cobertura,lcov,html); in that case --coverage-file is used as a path stem and per-format extensions are appended (.xml/.info/.html/.json)",
 	)
 }
 
