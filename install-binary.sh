@@ -54,28 +54,20 @@ buildFromSource() {
   return 0
 }
 
-# Explicit opt-in: build straight from source without trying the download
-# path. Useful in CI when you know the install must use the checked-out
-# branch and not whatever happens to be tagged in plugin.yaml.
-if [ "$BUILD_FROM_SOURCE" = "1" ] || [ "$BUILD_FROM_SOURCE" = "true" ]; then
-  buildFromSource && exit 0
-  exit 1
-fi
-
 # initArch discovers the architecture for this system.
 initArch() {
   ARCH=$(uname -m)
   case "$ARCH" in
-    armv5*) ARCH="armv5";;
-    armv6*) ARCH="armv6";;
-    armv7*) ARCH="armv7";;
-    aarch64) ARCH="arm64";;
-    x86) ARCH="386";;
-    x86_64) ARCH="amd64";;
-    i686) ARCH="386";;
-    i386) ARCH="386";;
-    ppc64le) ARCH="ppc64le";;
-    s390x) ARCH="s390x";;
+  armv5*) ARCH="armv5" ;;
+  armv6*) ARCH="armv6" ;;
+  armv7*) ARCH="armv7" ;;
+  aarch64) ARCH="arm64" ;;
+  x86) ARCH="386" ;;
+  x86_64) ARCH="amd64" ;;
+  i686) ARCH="386" ;;
+  i386) ARCH="386" ;;
+  ppc64le) ARCH="ppc64le" ;;
+  s390x) ARCH="s390x" ;;
   esac
 }
 
@@ -84,13 +76,13 @@ initOS() {
   OS=$(uname | tr '[:upper:]' '[:lower:]')
 
   case "$OS" in
-    # Windows NT
-    windows_nt) OS='windows';;
-    # Msys support
-    msys*) OS='windows';;
-    # Minimalist GNU for Windows
-    mingw*) OS='windows';;
-    darwin) OS='macos';;
+  # Windows NT
+  windows_nt) OS='windows' ;;
+  # Msys support
+  msys*) OS='windows' ;;
+  # Minimalist GNU for Windows
+  mingw*) OS='windows' ;;
+  darwin) OS='macos' ;;
   esac
 }
 
@@ -119,7 +111,7 @@ getDownloadURL() {
   # If no version found (because of no git), try fetch from plugin
   if [ -z "$version" ]; then
     echo "No version found"
-    version=v$(sed -n -e 's/version:[ "]*\([^"]*\).*/\1/p' plugin.yaml)  
+    version=v$(sed -n -e 's/version:[ "]*\([^"]*\).*/\1/p' plugin.yaml)
   fi
 
   # Setup Download Url
@@ -136,12 +128,12 @@ downloadFile() {
   mkdir -p "$PLUGIN_TMP_FOLDER"
   echo "Downloading "$DOWNLOAD_URL" to location $PLUGIN_TMP_FOLDER"
   if type "curl" >/dev/null 2>&1; then
-      # -f makes curl exit non-zero on HTTP errors (404 etc.) instead of
-      # silently writing an HTML error page to disk; the auto-fallback to a
-      # source build depends on that.
-      (cd "$PLUGIN_TMP_FOLDER" && curl --proto "=https" -f -LO "$DOWNLOAD_URL")
+    # -f makes curl exit non-zero on HTTP errors (404 etc.) instead of
+    # silently writing an HTML error page to disk; the auto-fallback to a
+    # source build depends on that.
+    (cd "$PLUGIN_TMP_FOLDER" && curl --proto "=https" -f -LO "$DOWNLOAD_URL")
   elif type "wget" >/dev/null 2>&1; then
-      wget -P "$PLUGIN_TMP_FOLDER" "$DOWNLOAD_URL"
+    wget -P "$PLUGIN_TMP_FOLDER" "$DOWNLOAD_URL"
   fi
 }
 
@@ -222,8 +214,8 @@ detectFork() {
   local remoteUrl
   remoteUrl=$(cd "$HELM_PLUGIN_PATH" && git config --get remote.origin.url 2>/dev/null || echo "")
   case "$remoteUrl" in
-    ""|*helm-unittest/helm-unittest*) return 1 ;;
-    *) return 0 ;;
+  "" | *helm-unittest/helm-unittest*) return 1 ;;
+  *) return 0 ;;
   esac
 }
 
@@ -245,7 +237,10 @@ fi
 
 # Try the prebuilt-release path first; if any step in it errors, fall back to
 # a source build when a Go toolchain is available.
-if (set -e; verifySupported && getDownloadURL && downloadFile && installFile); then
+if (
+  set -e
+  verifySupported && getDownloadURL && downloadFile && installFile
+); then
   testVersion
 else
   echo
